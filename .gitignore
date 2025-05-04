@@ -1,0 +1,35 @@
+# Credentials and sensitive data
+*.key
+*.pem
+.env
+.aws/
+credentials
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs and debugging
+*.log
+debug/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Backup files
+*.bak
+*.backup
+
+# Test outputs
+test-output/
+test-results/

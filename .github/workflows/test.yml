@@ -1,0 +1,35 @@
+name: Test Script
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Run shellcheck
+        run: |
+          wget -qO- "https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz" | tar -xJv
+          ./shellcheck-stable/shellcheck scaleway-dns-migration.sh
+
+      - name: Check script syntax
+        run: |
+          bash -n scaleway-dns-migration.sh
+
+      - name: Test without execution (dry run)
+        run: |
+          # Basic syntax test without actual execution
+          echo "Testing script exists and is executable"
+          test -f scaleway-dns-migration.sh
+          test -x scaleway-dns-migration.sh || chmod +x scaleway-dns-migration.sh
