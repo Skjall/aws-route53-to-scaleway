@@ -359,5 +359,4 @@ if [ "$DRY_RUN" = false ]; then
 fi
 
 echo
-echo "Migration complete! Check your records at:"
-echo "https://console.scaleway.com/domains/external/global/$ZONE_NAME/zones/root/records"
+echo "Migration complete!"
