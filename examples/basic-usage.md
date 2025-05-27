@@ -16,7 +16,7 @@
 AWS_PROFILE=production ./scaleway-dns-migration.sh example.com
 ```
 
-### Dry Run (Future Feature)
+### Dry Run
 
 ```bash
 # Would perform a dry run without making changes

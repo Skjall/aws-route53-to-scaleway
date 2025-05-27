@@ -37,13 +37,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check if zone name was provided
-if [ -z "$ZONE_NAME" ]; then
-    echo "Usage: $0 [options] <zone-name>"
-    echo "Use --help for more information"
-    exit 1
-fi
-
 # Check if required tools are installed
 for cmd in aws curl jq; do
     if ! command -v $cmd >/dev/null 2>&1; then
@@ -52,13 +45,111 @@ for cmd in aws curl jq; do
     fi
 done
 
-# Check if required environment variables are set
-if [ -z "$SCW_ACCESS_KEY" ] || [ -z "$SCW_SECRET_KEY" ]; then
-    echo "Error: Please set SCW_ACCESS_KEY and SCW_SECRET_KEY environment variables"
-    echo "Example: export SCW_ACCESS_KEY='your-access-key'"
-    echo "         export SCW_SECRET_KEY='your-secret-key'"
+# Function to check AWS CLI configuration
+check_aws_config() {
+    # Check if AWS CLI is configured by looking for credentials or config files
+    if ! aws sts get-caller-identity >/dev/null 2>&1; then
+        echo "AWS CLI is not configured or credentials are invalid."
+        read -p "Would you like to configure AWS now? (y/n): " configure_aws
+        if [[ "$configure_aws" =~ ^[Yy]$ ]]; then
+            aws configure
+            # Verify configuration worked
+            if ! aws sts get-caller-identity >/dev/null 2>&1; then
+                echo "Error: AWS configuration failed. Please configure AWS CLI manually."
+                exit 1
+            fi
+        else
+            echo "AWS CLI configuration is required for this script to work."
+            exit 1
+        fi
+    fi
+
+    # Get AWS account info (partially anonymized)
+    AWS_ACCOUNT_INFO=$(aws sts get-caller-identity --output json)
+    AWS_ACCOUNT_ID=$(echo "$AWS_ACCOUNT_INFO" | jq -r '.Account')
+    AWS_USER_ID=$(echo "$AWS_ACCOUNT_INFO" | jq -r '.UserId')
+
+    # Partially anonymize the account ID and user ID
+    MASKED_ACCOUNT_ID="${AWS_ACCOUNT_ID:0:4}...${AWS_ACCOUNT_ID: -4}"
+    MASKED_USER_ID="${AWS_USER_ID:0:4}...${AWS_USER_ID: -4}"
+
+    echo "Using AWS Credentials:"
+    echo "  Account: $MASKED_ACCOUNT_ID"
+    echo "  User ID: $MASKED_USER_ID"
+
+    read -p "Continue with these AWS credentials? (y/n): " confirm_aws
+    if [[ ! "$confirm_aws" =~ ^[Yy]$ ]]; then
+        echo "Operation cancelled by user."
+        exit 0
+    fi
+}
+
+# Function to check and configure Scaleway API credentials
+check_scaleway_config() {
+    if [ -z "$SCW_ACCESS_KEY" ] || [ -z "$SCW_SECRET_KEY" ]; then
+        echo "Scaleway API credentials not found in environment variables."
+        read -p "Would you like to set Scaleway credentials now? (y/n): " configure_scw
+        if [[ "$configure_scw" =~ ^[Yy]$ ]]; then
+            read -p "Enter your Scaleway Access Key: " SCW_ACCESS_KEY
+            read -p "Enter your Scaleway Secret Key: " SCW_SECRET_KEY
+
+            # Export the variables so they're available to the script
+            export SCW_ACCESS_KEY
+            export SCW_SECRET_KEY
+
+            echo "Scaleway credentials set temporarily for this session."
+            echo "To make them permanent, add the following to your ~/.bashrc or ~/.zshrc:"
+            echo "  export SCW_ACCESS_KEY='$SCW_ACCESS_KEY'"
+            echo "  export SCW_SECRET_KEY='$SCW_SECRET_KEY'"
+        else
+            echo "Scaleway API credentials are required for this script to work."
+            echo "Please set SCW_ACCESS_KEY and SCW_SECRET_KEY environment variables"
+            echo "Example: export SCW_ACCESS_KEY='your-access-key'"
+            echo "         export SCW_SECRET_KEY='your-secret-key'"
+            exit 1
+        fi
+    fi
+
+    # Display partially anonymized keys for confirmation
+    MASKED_ACCESS_KEY="${SCW_ACCESS_KEY:0:4}...${SCW_ACCESS_KEY: -4}"
+    MASKED_SECRET_KEY="${SCW_SECRET_KEY:0:4}...${SCW_SECRET_KEY: -4}"
+
+    echo "Using Scaleway credentials:"
+    echo "  Access Key: $MASKED_ACCESS_KEY"
+    echo "  Secret Key: $MASKED_SECRET_KEY"
+
+    # Verify Scaleway credentials by making a test API call
+    echo "Verifying Scaleway credentials..."
+    local response=$(curl -s -X GET \
+        -H "X-Auth-Token: $SCW_SECRET_KEY" \
+        -H "Content-Type: application/json" \
+        "https://api.scaleway.com/domain/v2beta1/dns-zones")
+
+    if echo "$response" | grep -q "error\|unauthorized\|invalid"; then
+        echo "Error: Scaleway credentials appear to be invalid."
+        echo "Response: $(echo "$response" | jq -r '.message // "Unknown error"')"
+        exit 1
+    else
+        echo "Scaleway credentials verified successfully."
+    fi
+
+    read -p "Continue with these Scaleway credentials? (y/n): " confirm_scw
+    if [[ ! "$confirm_scw" =~ ^[Yy]$ ]]; then
+        echo "Operation cancelled by user."
+        exit 0
+    fi
+}
+
+# Check if zone name was provided
+if [ -z "$ZONE_NAME" ]; then
+    echo "Usage: $0 [options] <zone-name>"
+    echo "Use --help for more information"
     exit 1
 fi
+
+# Check and configure AWS and Scaleway
+check_aws_config
+check_scaleway_config
 
 # Configuration
 SCALEWAY_API_URL="https://api.scaleway.com/domain/v2beta1"
@@ -359,5 +450,4 @@ if [ "$DRY_RUN" = false ]; then
 fi
 
 echo
-echo "Migration complete! Check your records at:"
-echo "https://console.scaleway.com/domains/external/global/$ZONE_NAME/zones/root/records"
+echo "Migration complete!"
