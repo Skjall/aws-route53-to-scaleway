@@ -42,7 +42,6 @@ aws configure
 
 2. Set Scaleway credentials:
 ```bash
-export SCW_ACCESS_KEY="your-access-key"
 export SCW_SECRET_KEY="your-secret-key"
 ```
 

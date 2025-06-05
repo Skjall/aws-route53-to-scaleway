@@ -2,6 +2,15 @@
 
 # AWS Route53 to Scaleway DNS Migration Script
 # This script exports DNS records from AWS Route53 and imports them to Scaleway
+#
+# Prerequisites:
+#   - AWS CLI configured with access to Route53
+#   - Scaleway API Secret Key (SCW_SECRET_KEY environment variable)
+#   - curl, jq, and aws CLI tools installed
+#
+# Usage:
+#   export SCW_SECRET_KEY='your-scaleway-secret-key'
+#   ./scaleway-dns-migration.sh [--dry-run] [--debug] <domain-name>
 
 # Parse command line arguments
 DRY_RUN=false
@@ -86,36 +95,30 @@ check_aws_config() {
 
 # Function to check and configure Scaleway API credentials
 check_scaleway_config() {
-    if [ -z "$SCW_ACCESS_KEY" ] || [ -z "$SCW_SECRET_KEY" ]; then
+    if [ -z "$SCW_SECRET_KEY" ]; then
         echo "Scaleway API credentials not found in environment variables."
         read -p "Would you like to set Scaleway credentials now? (y/n): " configure_scw
         if [[ "$configure_scw" =~ ^[Yy]$ ]]; then
-            read -p "Enter your Scaleway Access Key: " SCW_ACCESS_KEY
             read -p "Enter your Scaleway Secret Key: " SCW_SECRET_KEY
 
-            # Export the variables so they're available to the script
-            export SCW_ACCESS_KEY
+            # Export the variable so it's available to the script
             export SCW_SECRET_KEY
 
             echo "Scaleway credentials set temporarily for this session."
             echo "To make them permanent, add the following to your ~/.bashrc or ~/.zshrc:"
-            echo "  export SCW_ACCESS_KEY='$SCW_ACCESS_KEY'"
             echo "  export SCW_SECRET_KEY='$SCW_SECRET_KEY'"
         else
             echo "Scaleway API credentials are required for this script to work."
-            echo "Please set SCW_ACCESS_KEY and SCW_SECRET_KEY environment variables"
-            echo "Example: export SCW_ACCESS_KEY='your-access-key'"
-            echo "         export SCW_SECRET_KEY='your-secret-key'"
+            echo "Please set SCW_SECRET_KEY environment variable"
+            echo "Example: export SCW_SECRET_KEY='your-secret-key'"
             exit 1
         fi
     fi
 
-    # Display partially anonymized keys for confirmation
-    MASKED_ACCESS_KEY="${SCW_ACCESS_KEY:0:4}...${SCW_ACCESS_KEY: -4}"
+    # Display partially anonymized key for confirmation
     MASKED_SECRET_KEY="${SCW_SECRET_KEY:0:4}...${SCW_SECRET_KEY: -4}"
 
     echo "Using Scaleway credentials:"
-    echo "  Access Key: $MASKED_ACCESS_KEY"
     echo "  Secret Key: $MASKED_SECRET_KEY"
 
     # Verify Scaleway credentials by making a test API call
